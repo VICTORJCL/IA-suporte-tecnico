@@ -82,7 +82,6 @@ agente/
   palantir.py        heartbeat para o Palantir
 data/                ferramentas do agente (Playwright + API)
 instructions/        prompts do agente
-Main_agent.py        versão anterior, mantida como referência
 ```
 
 ## Como executar
