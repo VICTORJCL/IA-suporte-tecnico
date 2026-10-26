@@ -2,7 +2,6 @@
 
 ![Python](https://img.shields.io/badge/Python-3.13-3776AB?logo=python&logoColor=white)
 ![Agno](https://img.shields.io/badge/Agno-3.1-FF6B35)
-![OpenAI](https://img.shields.io/badge/OpenAI-GPT--4.1-412991?logo=openai&logoColor=white)
 ![Playwright](https://img.shields.io/badge/Playwright-1.64-2EAD33?logo=playwright&logoColor=white)
 ![Docker](https://img.shields.io/badge/Docker-ready-2496ED?logo=docker&logoColor=white)
 
@@ -28,7 +27,7 @@ Tira do time de TI as tarefas repetitivas do dia a dia e atende a qualquer hora,
 ```mermaid
 flowchart LR
     A[Acelerato<br/>chamados pendentes] -->|a cada 2 min| B[Monitor]
-    B -->|título com palavra-chave| C[Agente de IA<br/>GPT-4.1]
+    B -->|título com palavra-chave| C[Agente de IA]
     C -->|escolhe a ferramenta| D[Automações<br/>Playwright + API]
     D --> E[ERP Bluesoft]
     D --> F[Zanthus PDV]
@@ -53,7 +52,7 @@ O **Palantir** é o serviço de monitoramento interno do time: ele recebe um sin
 |---|---|
 | **Python 3.13** | Linguagem do projeto, com type hints e dataclasses |
 | **[Agno](https://github.com/agno-agi/agno)** | Framework do agente: ferramentas, instruções e hooks de execução |
-| **OpenAI GPT-4.1** | Modelo de linguagem que interpreta os chamados e decide a ação |
+| **LLM (modelo de linguagem)** | Interpreta os chamados e decide a ação; o provedor é trocável |
 | **Playwright** | Automação web (Chromium headless) no ERP, no PDV e no painel |
 | **Requests** | Integração com a API REST do Acelerato |
 | **Pandas + openpyxl** | Leitura e padronização de planilhas e CSVs |
