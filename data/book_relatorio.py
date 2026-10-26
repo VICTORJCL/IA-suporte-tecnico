@@ -3,13 +3,14 @@ import traceback
 from datetime import date, datetime
 from time import sleep
 from typing import TypedDict
+from pathlib import Path
 
 from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeoutError
 from dotenv import load_dotenv
+from data.sistemas import PAINEL_URL, ZANTHUS_URL
 
-# # ─── Carrega variáveis de ambiente ───────────────────────────────────────────
-# caminho_env = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), '.env')
-# load_dotenv(caminho_env)
+ENV_PATH = Path(__file__).resolve().parent.parent / '.env'
+load_dotenv(dotenv_path=ENV_PATH)
 
 
 class ResultadoExecucao(TypedDict):
@@ -38,9 +39,8 @@ class BookRelatorio:
 
     def __init__(self):
         self.hoje = date.today().strftime("%d/%m/%Y")
-        os.chdir(os.path.dirname(os.path.abspath(__file__)))
-        os.makedirs("arquivos", exist_ok=True)
-
+        self.pasta_arquivos = Path(__file__).resolve().parent / "arquivos"
+        self.pasta_arquivos.mkdir(parents=True, exist_ok=True)
 
     # =========================================================================
     # ETAPA 1 — Download do CSV no Zanthus
@@ -52,10 +52,10 @@ class BookRelatorio:
         senha = os.getenv('SENHA_ZEUS')
 
         if not login or not senha:
-            raise ValueError("Credenciais LOGIN ou SENHA não encontradas no .env")
+            raise ValueError("Credenciais LOG_ZEUS ou SENHA_ZEUS não encontradas no .env")
 
         print("[Zanthus] Realizando login...")
-        page.goto(f"{os.getenv('ZANTHUS_URL')}/manager/cad_voucher_promocional.php5?id_menu=30204")
+        page.goto(f'{ZANTHUS_URL}/manager/cad_voucher_promocional.php5?id_menu=30204')
         page.fill('#USUARIO', login)
         page.fill('#SENHA', senha)
         page.get_by_role("button", name="Entrar").click()
@@ -63,7 +63,7 @@ class BookRelatorio:
 
     def _download_csv(self, page, data_ini: str, data_fin: str) -> str:
         """Navega até o relatório, aplica datas e faz download do CSV. Retorna o caminho local."""
-        page.goto(f"{os.getenv('ZANTHUS_URL')}/manager/relatorio_dinamico_sel.php5?id_menu=614")
+        page.goto(f'{ZANTHUS_URL}/manager/relatorio_dinamico_sel.php5?id_menu=614')
         sleep(3)
 
         page.locator('a').filter(has_text="PDVT-Vendas E-Book").click()
@@ -88,10 +88,10 @@ class BookRelatorio:
             page.locator('''//i[@onclick="MostraRelatorio('CSV');"]''').click()
 
         download = download_info.value
-        caminho_destino = os.path.join("arquivos", download.suggested_filename)
+        caminho_destino = str(self.pasta_arquivos / download.suggested_filename)
         download.save_as(caminho_destino)
 
-        print(f"[Zanthus] ✓ Arquivo salvo em: {caminho_destino}")
+        print(f"[Zanthus] [OK] Arquivo salvo em: {caminho_destino}")
         return caminho_destino
 
     def _etapa_baixar(self) -> str:
@@ -123,7 +123,7 @@ class BookRelatorio:
             raise ValueError("Credenciais LOGIN_S ou SENHA_S não encontradas no .env")
 
         print("[Painel] Realizando login...")
-        page.goto(f"{os.getenv('PAINEL_URL')}/")
+        page.goto(f'{PAINEL_URL}/')
         page.get_by_role("textbox", name="Enter username").fill(login)
         page.get_by_role("textbox", name="Password").fill(senha)
         sleep(1)
@@ -133,11 +133,8 @@ class BookRelatorio:
 
     def _navegar_pasta_cupons(self, page):
         """Navega até a pasta de cupons no filemanager do painel."""
-        # page.get_by_role("link", name=" Websites ").click()
-        page.goto(f"{os.getenv('PAINEL_URL')}/websites/listWebsites")
+        page.goto(f"{PAINEL_URL}/websites/listWebsites")
         sleep(3)
-        # page.get_by_role("link", name="List Websites").click()
-        sleep(2)
         page.get_by_role("link", name="Filemanager").nth(2).click()
         sleep(2)
         page.locator(".list-group-item > a").first.click()
@@ -156,13 +153,13 @@ class BookRelatorio:
         sleep(3)
         page.get_by_role("button", name="Upload all").click()
         sleep(9)
-        print("[Painel] ✓ Upload concluído.")
+        print("[Painel] [OK] Upload concluído.")
 
     def _etapa_enviar(self, caminho: str):
         """Abre o browser, faz login no painel e envia o CSV."""
         print("\n=== ETAPA 2: Enviando CSV para o Painel ===")
         with sync_playwright() as p:
-            browser = p.chromium.launch(headless=False, slow_mo=1500)
+            browser = p.chromium.launch(headless=True, slow_mo=1500)
             context = browser.new_context(accept_downloads=True)
             page = context.new_page()
             page.set_default_timeout(50000)
@@ -179,20 +176,18 @@ class BookRelatorio:
 
     def _limpar_arquivos(self) -> int:
         """Remove todos os arquivos .csv da pasta 'arquivos'. Retorna a quantidade removida."""
-        pasta = os.path.join(os.path.dirname(os.path.abspath(__file__)), "arquivos")
         removidos = 0
         try:
-            for arquivo in os.listdir(pasta):
-                if arquivo.lower().endswith(".csv"):
-                    caminho_arq = os.path.join(pasta, arquivo)
-                    os.remove(caminho_arq)
-                    print(f"[Limpeza] 🗑️  Removido: {arquivo}")
-                    removidos += 1
-            print(f"[Limpeza] ✓ {removidos} arquivo(s) removido(s).")
+            if self.pasta_arquivos.exists():
+                for item in self.pasta_arquivos.iterdir():
+                    if item.is_file() and item.suffix.lower() == ".csv":
+                        item.unlink()
+                        print(f"[Limpeza] Removido: {item.name}")
+                        removidos += 1
+            print(f"[Limpeza] [OK] {removidos} arquivo(s) removido(s).")
         except Exception as e:
-            print(f"[Limpeza] ⚠️  Erro ao limpar arquivos (não crítico): {e}")
+            print(f"[Limpeza] [AVISO] Erro ao limpar arquivos (não crítico): {e}")
         return removidos
-
 
     # =========================================================================
     # PONTO DE ENTRADA PRINCIPAL
@@ -215,7 +210,7 @@ class BookRelatorio:
         arquivo_csv = ""
         etapa_atual = "inicialização"
 
-        print(f"📅 Data de hoje: {self.hoje}")
+        print(f"Data de hoje: {self.hoje}")
 
         try:
             # ── Etapa 1: Download ──────────────────────────────────────────
@@ -231,7 +226,7 @@ class BookRelatorio:
             self._limpar_arquivos()
 
             # ── Sucesso ────────────────────────────────────────────────────
-            print("✅ Processo concluído com sucesso!")
+            print("[SUCESSO] Processo concluído com sucesso!")
             return ResultadoExecucao(
                 sucesso=True,
                 etapa="concluído",
@@ -243,9 +238,8 @@ class BookRelatorio:
             )
 
         except ValueError as e:
-            # Erros de configuração (.env incompleto, credenciais ausentes)
             msg_erro = f"[{etapa_atual}] Erro de configuração: {e}"
-            print(f"❌ {msg_erro}")
+            print(f"[ERRO] {msg_erro}")
             return ResultadoExecucao(
                 sucesso=False,
                 etapa=etapa_atual,
@@ -257,9 +251,8 @@ class BookRelatorio:
             )
 
         except PlaywrightTimeoutError as e:
-            # Timeout ao interagir com o browser (elemento não encontrado, página lenta)
             msg_erro = f"[{etapa_atual}] Timeout no browser: {e}"
-            print(f"❌ {msg_erro}")
+            print(f"[ERRO] {msg_erro}")
             return ResultadoExecucao(
                 sucesso=False,
                 etapa=etapa_atual,
@@ -271,9 +264,8 @@ class BookRelatorio:
             )
 
         except Exception as e:
-            # Qualquer outro erro inesperado
             msg_erro = f"[{etapa_atual}] Erro inesperado: {e}\n{traceback.format_exc()}"
-            print(f"❌ {msg_erro}")
+            print(f"[ERRO] {msg_erro}")
             return ResultadoExecucao(
                 sucesso=False,
                 etapa=etapa_atual,

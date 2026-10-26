@@ -1,0 +1,10 @@
+.venv
+.git
+.env
+*.env
+__pycache__
+tests
+Main_agent.py
+data/arquivos
+*.png
+*.zip

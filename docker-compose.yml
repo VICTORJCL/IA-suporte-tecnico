@@ -1,0 +1,9 @@
+services:
+  agente:
+    build: .
+    env_file: .env
+    restart: unless-stopped
+    shm_size: 1gb
+    stop_grace_period: 2m
+    volumes:
+      - ./data/agendamentos_pendentes.json:/app/data/agendamentos_pendentes.json

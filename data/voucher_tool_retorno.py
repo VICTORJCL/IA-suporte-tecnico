@@ -4,6 +4,7 @@ import os
 import random
 from dotenv import load_dotenv
 from typing import Union
+from data.sistemas import ZANTHUS_URL
 
 
 # Inicializa Playwright
@@ -12,13 +13,13 @@ def voucher_tools_pl(parametros_voucher: list[dict]) -> tuple[list, list]:
     historico_valchers: list[list] = []
     avisos_voucher: list[str] = []
 
-    caminho_atual = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    os.chdir(caminho_atual)
+    from pathlib import Path
+    base_dir = Path(__file__).resolve().parent.parent
+    env_path = base_dir / '.env'
+    load_dotenv(dotenv_path=env_path)
 
-    load_dotenv()
-
-    log_zeus = os.getenv('log_zeus')
-    senha_zeus = os.getenv('senha_zeus')
+    log_zeus = os.getenv('log_zeus') or os.getenv('LOG_ZEUS')
+    senha_zeus = os.getenv('senha_zeus') or os.getenv('SENHA_ZEUS')
     if not log_zeus or not senha_zeus:
         raise RuntimeError('Credenciais log_zeus ou senha_zeus não foram encontradas no .env')
 
@@ -92,7 +93,7 @@ def voucher_tools_pl(parametros_voucher: list[dict]) -> tuple[list, list]:
             pass
 
     def login_function(page: Page) -> None:
-        page.goto(f"{os.getenv('ZANTHUS_URL')}/manager/adm_cargaDiretaArquivosSemZMS.php5?id_menu=405")
+        page.goto(f'{ZANTHUS_URL}/manager/adm_cargaDiretaArquivosSemZMS.php5?id_menu=405')
         page.wait_for_selector('#USUARIO', timeout=15000)
         page.fill('#USUARIO', log_zeus)
         page.fill('#SENHA', senha_zeus)
@@ -104,7 +105,7 @@ def voucher_tools_pl(parametros_voucher: list[dict]) -> tuple[list, list]:
         except:
             pass
 
-        page.goto(f"{os.getenv('ZANTHUS_URL')}/manager/cad_voucher_promocional.php5?opt=Inc&id_menu=30204")
+        page.goto(f'{ZANTHUS_URL}/manager/cad_voucher_promocional.php5?opt=Inc&id_menu=30204')
         page.wait_for_load_state('networkidle')
         sleep(1)
         print('DEBUG: current page URL after login:', page.url)
@@ -180,7 +181,7 @@ def voucher_tools_pl(parametros_voucher: list[dict]) -> tuple[list, list]:
         except:
             pass
 
-        page.goto(f"{os.getenv('ZANTHUS_URL')}/manager/cad_voucher_promocional.php5?opt=Inc&id_menu=30204")
+        page.goto(f'{ZANTHUS_URL}/manager/cad_voucher_promocional.php5?opt=Inc&id_menu=30204')
         page.wait_for_selector('//input[@id="COD_VOUCHER"]', timeout=20000)
         page.wait_for_timeout(1200)
         notification(page)
@@ -271,7 +272,7 @@ def voucher_tools_pl(parametros_voucher: list[dict]) -> tuple[list, list]:
 
     resultados: list[dict] = []
     with sync_playwright() as pw:
-        browser = pw.chromium.launch(headless=False)
+        browser = pw.chromium.launch(headless=True)
         context = browser.new_context(viewport={"width": 1920, "height": 1080})
         page = context.new_page()
 

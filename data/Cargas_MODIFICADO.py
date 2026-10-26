@@ -2,6 +2,8 @@ from playwright.sync_api import sync_playwright
 from time import sleep
 import os
 from dotenv import load_dotenv, dotenv_values
+from .carga_lock import carga_exclusiva
+from data.sistemas import BLUESOFT_URL, ZANTHUS_URL
 # from arq_api_acelerato import responder_chamado_acelerato
 
 #  Desenvolvido por Victor José Costta Lameiro   https://www.linkedin.com/in/victorjcl  https://github.com/victorjcl
@@ -52,6 +54,7 @@ OBSERVAÇÕES:
 
 
 
+@carga_exclusiva
 def executar_cargas_playwright(conjunto_lojas=None, lojas_especificas=None):
     aviso_erro=[]
     avisos_blue = {}
@@ -103,18 +106,20 @@ def executar_cargas_playwright(conjunto_lojas=None, lojas_especificas=None):
     print(f'Lojas selecionadas: {selecao_lojas}')
     
     # Carrega credenciais do .env
-    caminho_atual = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    os.chdir(caminho_atual)
-    load_dotenv()
-    config = dotenv_values(".env")
+    from pathlib import Path
+    base_dir = Path(__file__).resolve().parent.parent
+    env_path = base_dir / '.env'
+    load_dotenv(dotenv_path=env_path)
+    config = dotenv_values(env_path)
     
     for key, value in config.items():
-        os.environ[key] = value
+        if value is not None:
+            os.environ[key] = value
     
-    log_blue = os.getenv('LOG_BLUE')
-    senha_blue = os.getenv('SENHA_BLUE')
-    log_zeus = os.getenv('LOG_ZEUS')
-    senha_zeus = os.getenv('SENHA_ZEUS')
+    log_blue = os.getenv('log_blue') or os.getenv('LOG_BLUE')
+    senha_blue = os.getenv('senha_blue') or os.getenv('SENHA_BLUE')
+    log_zeus = os.getenv('log_zeus') or os.getenv('LOG_ZEUS')
+    senha_zeus = os.getenv('senha_zeus') or os.getenv('SENHA_ZEUS')
     
     # Mapeamento de lojas
     all_lojas_unicas = {
@@ -149,14 +154,13 @@ def executar_cargas_playwright(conjunto_lojas=None, lojas_especificas=None):
     
     # Inicia Playwright
     with sync_playwright() as p:
-        # browser = p.chromium.launch(headless=True)
-        browser = p.chromium.launch(headless=False)
+        browser = p.chromium.launch(headless=True)
         page = browser.new_page()
         page.set_default_timeout(30000)
         
         # ==================== BLUESOFT ====================
         print("\n=== INICIANDO BLUESOFT ===")
-        page.goto(f"{os.getenv('BLUESOFT_URL')}/menu/170")
+        page.goto(f'{BLUESOFT_URL}/menu/170')
         
         # Login Bluesoft
         page.wait_for_selector("#j_username")
@@ -166,7 +170,7 @@ def executar_cargas_playwright(conjunto_lojas=None, lojas_especificas=None):
         page.click("#btnSubmit")
         page.wait_for_selector("#conteudoFrenteCaixa")
         
-        print("✓ Login Bluesoft realizado")
+        print("[OK] Login Bluesoft realizado")
         
         # Configura página de cargas
         sleep(2)
@@ -177,16 +181,16 @@ def executar_cargas_playwright(conjunto_lojas=None, lojas_especificas=None):
         # page.get_by_role("checkbox", name="PDVs Regras Fiscais (Zanthus)").click()
         page.get_by_role("checkbox", name="Etiquetas").click()
         
-        print("✓ Configurações de carga aplicadas")
+        print("[OK] Configurações de carga aplicadas")
         
         # Marca lojas no Bluesoft
         for loja in selecao_lojas:
             page.locator(f'//label[contains(., "{all_lojas_unicas[loja][1]}")]/input[@type="checkbox"]').click()
-            print(f"✓ Loja {all_lojas_unicas[loja][1]} marcada")
+            print(f"[OK] Loja {all_lojas_unicas[loja][1]} marcada")
         
         sleep(2)
         page.locator('//button[@id="gerarArquivos"]').click()
-        print("✓ Geração de cargas iniciada no Bluesoft")
+        print("[OK] Geração de cargas iniciada no Bluesoft")
         
         # Monitora progresso Bluesoft
         sleep(20)
@@ -215,7 +219,7 @@ def executar_cargas_playwright(conjunto_lojas=None, lojas_especificas=None):
                     break
                 count_blue += 30
                 if count_blue >= 5000:
-                    print('⚠️ Tempo de espera Bluesoft expirado (5000s)')
+                    print('[AVISO] Tempo de espera Bluesoft expirado (5000s)')
                     break
             
         # Captura relatório de avisos/erros das lojas
@@ -230,21 +234,21 @@ def executar_cargas_playwright(conjunto_lojas=None, lojas_especificas=None):
                     texto_aviso = aviso_element.inner_text()
                     if 'Arquivo(s) gerado(s) com sucesso' not in texto_aviso:
                         avisos_blue[l.inner_text()] = texto_aviso
-                        print(f'⚠️ Aviso na loja {l.inner_text()}: {texto_aviso}')
+                        print(f'[AVISO] Aviso na loja {l.inner_text()}: {texto_aviso}')
                 except Exception as e:
                     # Ignora erros ao processar lojas individuais
                     continue
             
             if avisos_blue:
-                print(f'\n⚠️ Avisos encontrados em {len(avisos_blue)} loja(s) no Bluesoft')
+                print(f'\n[AVISO] Avisos encontrados em {len(avisos_blue)} loja(s) no Bluesoft')
         except Exception as e:
-            print(f'⚠️ Não foi possível capturar relatório de avisos: {e}')
+            print(f'[AVISO] Não foi possível capturar relatório de avisos: {e}')
         
-        print('✓ Lojas finalizadas no Bluesoft\n')
+        print('[OK] Lojas finalizadas no Bluesoft\n')
         
         # ==================== ZANTHUS ====================
         print("=== INICIANDO ZANTHUS ===")
-        page.goto(f"{os.getenv('ZANTHUS_URL')}/manager/adm_cargaDiretaArquivosSemZMS.php5?id_menu=405")
+        page.goto(f'{ZANTHUS_URL}/manager/adm_cargaDiretaArquivosSemZMS.php5?id_menu=405')
         
         # Login Zanthus
         page.wait_for_selector("#USUARIO")
@@ -253,7 +257,7 @@ def executar_cargas_playwright(conjunto_lojas=None, lojas_especificas=None):
         page.locator('//input[@type="submit" and @value=" Entrar "]').click()
         sleep(3)
         
-        page.goto(f"{os.getenv('ZANTHUS_URL')}/manager/adm_cargaDiretaArquivosSemZMS.php5?id_menu=405")
+        page.goto(f'{ZANTHUS_URL}/manager/adm_cargaDiretaArquivosSemZMS.php5?id_menu=405')
         # page.wait_for_selector("#TOP_HEADER")
         try:
             page.locator('//span[@aria-hidden="true"]').click(timeout=1000)
@@ -261,7 +265,7 @@ def executar_cargas_playwright(conjunto_lojas=None, lojas_especificas=None):
             pass
         
         page.wait_for_selector("#btn_AddFavoritos")
-        print("✓ Login Zanthus realizado")
+        print("[OK] Login Zanthus realizado")
         
         # Mantém sessão ativa no Zanthus durante o monitoramento (keepalive periódico)
         def keep_alive ():
@@ -302,12 +306,12 @@ def executar_cargas_playwright(conjunto_lojas=None, lojas_especificas=None):
                 checkbox_xpath = f'//input[@id="GERA_{loja_id}"]/following-sibling::div[@class="control__indicator"]'
                 page.locator(checkbox_xpath).click()
                 lojas_marcadas.append((loja_id, loja_nome))
-                print(f'✓ Loja {loja_nome} (ID: {loja_id}) marcada')
+                print(f'[OK] Loja {loja_nome} (ID: {loja_id}) marcada')
                 sleep(0.5)
             
             # Clica em gerar carga
             page.locator('//input[@id="gerarParcial"]').click()
-            print(f'✓ Carga iniciada para {len(lojas_marcadas)} loja(s)')
+            print(f'[OK] Carga iniciada para {len(lojas_marcadas)} loja(s)')
             sleep(10)
             
             # Função para detectar erros no formato do tempo
@@ -315,7 +319,7 @@ def executar_cargas_playwright(conjunto_lojas=None, lojas_especificas=None):
                 nonlocal aviso_erro
                 if ':' not in tempo and 's' not in tempo:
                     aviso_erro.append(f'Erro de carga na loja {loja_id_param}: {tempo}')
-                    print(f'⚠️ Erro detectado na loja {loja_id_param}: {tempo}')
+                    print(f'[ERRO] Erro detectado na loja {loja_id_param}: {tempo}')
                     return True
                 return False
             
@@ -348,7 +352,7 @@ def executar_cargas_playwright(conjunto_lojas=None, lojas_especificas=None):
                     
                     # Timeout de 2700 segundos 
                     if count_zanthus >=2700:
-                        print(f'⚠️ Timeout de 2700 segundos atingido para loja {loja_nome}')
+                        print(f'[AVISO] Timeout de 2700 segundos atingido para loja {loja_nome}')
                         aviso_erro.append(f'Timeout na loja {loja_id}: processo excedeu 45 min')
                         break
                     
@@ -379,14 +383,14 @@ def executar_cargas_playwright(conjunto_lojas=None, lojas_especificas=None):
                     
                     tentativas += 1
                 
-                print(f'✓ Loja {loja_nome} concluída!')
+                print(f'[OK] Loja {loja_nome} concluída!')
             
             # Desmarca lojas
             for loja_id, loja_nome in lojas_marcadas:
                 try:
                     checkbox_xpath = f'//input[@id="GERA_{loja_id}"]/following-sibling::div[@class="control__indicator"]'
                     page.locator(checkbox_xpath).click()
-                    print(f'✓ Loja {loja_nome} desmarcada')
+                    print(f'[OK] Loja {loja_nome} desmarcada')
                     sleep(0.5)
                 except:
                     pass
@@ -399,11 +403,11 @@ def executar_cargas_playwright(conjunto_lojas=None, lojas_especificas=None):
         if aviso_erro or avisos_blue:
             print('PROCESSO FINALIZADO COM AVISOS/ERROS')
             if avisos_blue:
-                print(f'\n⚠️ Avisos no Bluesoft: {len(avisos_blue)} loja(s)')
+                print(f'\n[AVISO] Avisos no Bluesoft: {len(avisos_blue)} loja(s)')
                 for loja, aviso in avisos_blue.items():
                     print(f'  - {loja}: {aviso}')
             if aviso_erro:
-                print(f'\n⚠️ Erros no Zanthus: {len(aviso_erro)}')
+                print(f'\n[ERRO] Erros no Zanthus: {len(aviso_erro)}')
                 for erro in aviso_erro:
                     print(f'  - {erro}')
         else:
@@ -422,7 +426,6 @@ def executar_cargas_playwright(conjunto_lojas=None, lojas_especificas=None):
             pass
         
         browser.close()
-        p.stop()
 
         # Retorno condicional baseado nos erros encontrados
         if aviso_erro and not avisos_blue:
@@ -473,7 +476,7 @@ if __name__ == "__main__":
     # func_retorno = executar_cargas_playwright(lojas_especificas=["900","201","202","208","301","303","304"])
     # print(func_retorno)
     
-    # print("\n✓ Arquivo de teste criado com sucesso!")
+    # print("\n[OK] Arquivo de teste criado com sucesso!")
     # print("Descomente qualquer teste acima para executar")
     # print("\nREQUISITOS:")
     # print("1. pip install playwright python-dotenv")
