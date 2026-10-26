@@ -1,0 +1,33 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+tests/
+
+# Virtual environments
+.venv
+
+*.env
+.env
+.env.*
+!.env.example
+.pytest_cache/
+
+melhoria.txt
+*.lock
+*.db
+dependências.txt
+debug_voucher_selectors.py
+*.python-version
+*.zip
+__pycache__/
+arquivos/
+inspect_voucher_dom.py
+DB_SQLITE/
+*.png
+run_voucher_creation.py.venv/
+run_voucher_creation.py.venv/
