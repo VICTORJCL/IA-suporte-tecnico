@@ -3,13 +3,25 @@ import logging
 from typing import Any, Callable
 
 from agno.agent import Agent
+from agno.exceptions import ModelProviderError, ModelRateLimitError
 from agno.models.base import Model
+from agno.models.deepseek import DeepSeek
+from agno.models.fallback import FallbackConfig
 from agno.models.openai import OpenAIChat
+from agno.models.response import ModelResponse
+from agno.run.base import RunStatus
 from agno.tools.reasoning import ReasoningTools
 
 import instructions.instructions_auto_agent as prompt_operacional
 from agente.acelerato import Acelerato, Comentario
-from agente.config import AVISO_DE_NOVA_TENTATIVA, DEBUG, MODELO_ID, NOME_DO_AGENTE
+from agente.config import (
+    AVISO_DE_NOVA_TENTATIVA,
+    DEBUG,
+    MODELO_ID,
+    MODELO_RESERVA_ID,
+    NOME_DO_AGENTE,
+    TEMPO_LIMITE_DA_IA_EM_SEGUNDOS,
+)
 from data.tools import (
     book_relatorio,
     derruba_pack,
@@ -40,14 +52,38 @@ INSTRUCAO_DE_FALHA = (
 )
 
 
+class DeepSeekComReserva(DeepSeek):
+    # O Agno não aciona a reserva em erros 4xx como o 402 (sem crédito) da DeepSeek; só em 429 e 5xx.
+    def invoke(self, *args: Any, **kwargs: Any) -> ModelResponse:
+        try:
+            return super().invoke(*args, **kwargs)
+        except ModelProviderError as erro:
+            raise ModelRateLimitError(erro.message, erro.status_code, erro.model_name, erro.model_id) from erro
+
+
 def criar_modelo(modelo_id: str = MODELO_ID) -> Model:
-    return OpenAIChat(id=modelo_id)
+    # Sem thinking: com ferramentas, a API exige o reasoning_content de volta, e mensagens da reserva não o têm.
+    return DeepSeekComReserva(
+        id=modelo_id,
+        use_thinking=False,
+        timeout=TEMPO_LIMITE_DA_IA_EM_SEGUNDOS,
+        max_retries=1,
+    )
 
 
-def criar_agente(modelo: Model) -> Agent:
+def criar_modelo_reserva(modelo_id: str = MODELO_RESERVA_ID) -> Model:
+    return OpenAIChat(id=modelo_id, timeout=TEMPO_LIMITE_DA_IA_EM_SEGUNDOS)
+
+
+def registrar_uso_da_reserva(modelo_principal: str, modelo_reserva: str, erro: Exception) -> None:
+    log.warning("%s falhou (%s); atendido por %s", modelo_principal, erro, modelo_reserva)
+
+
+def criar_agente(modelo: Model, reserva: Model) -> Agent:
     return Agent(
         name=NOME_DO_AGENTE,
         model=modelo,
+        fallback_config=FallbackConfig(on_error=[reserva], callback=registrar_uso_da_reserva),
         tools=FERRAMENTAS,
         tool_hooks=[avisar_falha],
         role=role_auto_agent,
@@ -111,4 +147,8 @@ class Atendente:
     def _executar(self, ticket_key: int, mensagem: str) -> None:
         log.info("Enviando chamado #%s ao agente", ticket_key)
         resposta = self.agent.run(mensagem)
+        # O Agno não lança exceção quando o principal e a reserva falham: devolve status de erro.
+        if resposta.status == RunStatus.error:
+            log.error("Chamado #%s não foi atendido: %s", ticket_key, resposta.content)
+            return
         log.info("Chamado #%s: %s", ticket_key, resposta.content)
