@@ -1,4 +1,5 @@
 import os
+import sys
 import traceback
 from datetime import date, datetime
 from time import sleep
@@ -7,6 +8,10 @@ from pathlib import Path
 
 from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeoutError
 from dotenv import load_dotenv
+
+if not __package__:
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
 from data.sistemas import PAINEL_URL, ZANTHUS_URL
 
 ENV_PATH = Path(__file__).resolve().parent.parent / '.env'
@@ -134,8 +139,9 @@ class BookRelatorio:
     def _navegar_pasta_cupons(self, page):
         """Navega até a pasta de cupons no filemanager do painel."""
         page.goto(f"{PAINEL_URL}/websites/listWebsites")
+        # page.pause()
         sleep(3)
-        page.get_by_role("link", name="Filemanager").nth(2).click()
+        page.get_by_role("link", name="Filemanager").nth(3).click()
         sleep(2)
         page.locator(".list-group-item > a").first.click()
         sleep(2)
