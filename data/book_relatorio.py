@@ -48,8 +48,8 @@ class BookRelatorio:
 
     def _login_zanthus(self, page):
         """Realiza login no sistema Zanthus."""
-        login = os.getenv('LOG_ZEUS')
-        senha = os.getenv('SENHA_ZEUS')
+        login = os.getenv('LOG_ZEUS') or os.getenv('log_zeus')
+        senha = os.getenv('SENHA_ZEUS') or os.getenv('senha_zeus')
 
         if not login or not senha:
             raise ValueError("Credenciais LOG_ZEUS ou SENHA_ZEUS não encontradas no .env")
@@ -159,7 +159,7 @@ class BookRelatorio:
         """Abre o browser, faz login no painel e envia o CSV."""
         print("\n=== ETAPA 2: Enviando CSV para o Painel ===")
         with sync_playwright() as p:
-            browser = p.chromium.launch(headless=True, slow_mo=1500)
+            browser = p.chromium.launch(headless=False, slow_mo=1500)
             context = browser.new_context(accept_downloads=True)
             page = context.new_page()
             page.set_default_timeout(50000)
