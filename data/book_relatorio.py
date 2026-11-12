@@ -165,7 +165,7 @@ class BookRelatorio:
         """Abre o browser, faz login no painel e envia o CSV."""
         print("\n=== ETAPA 2: Enviando CSV para o Painel ===")
         with sync_playwright() as p:
-            browser = p.chromium.launch(headless=False, slow_mo=1500)
+            browser = p.chromium.launch(headless=True, slow_mo=1500)
             context = browser.new_context(accept_downloads=True)
             page = context.new_page()
             page.set_default_timeout(50000)
